@@ -905,8 +905,8 @@ module.exports = function finalizeProcessing(Processing, options) {
    * @param {CANVAS} canvas The html canvas element to bind to
    * @param {String[]} source The array of files that must be loaded
    */
-  var loadSketchFromSources = Processing.loadSketchFromSources = function(canvas, sources) {
-    var code = [], errors = [], sourcesCount = sources.length, loaded = 0;
+  var loadSketchFromSources = Processing.loadSketchFromSources = function(canvas, sources, indoc) {
+    var code = [], errors = [], sourcesCount = sources.length, loaded = 0, finalCode;
 
     function ajaxAsync(url, callback) {
       var xhr = new XMLHttpRequest();
@@ -947,7 +947,11 @@ module.exports = function finalizeProcessing(Processing, options) {
         if (loaded === sourcesCount) {
           if (errors.length === 0) {
             // This used to throw, but it was constantly getting in the way of debugging where things go wrong!
-            return new Processing(canvas, code.join("\n"));
+            finalCode = code.join("\n");
+            if (indoc !== undef) {
+              finalCode += "\n" + indoc;
+            }
+            return new Processing(canvas, finalCode);
           } else {
             throw "Processing.js: Unable to load pjs sketch files: " + errors.join("\n");
           }
@@ -993,33 +997,10 @@ module.exports = function finalizeProcessing(Processing, options) {
     var canvas = document.getElementsByTagName('canvas'),
       filenames;
 
-    for (i = 0, l = canvas.length; i < l; i++) {
-      // datasrc and data-src are deprecated.
-      var processingSources = canvas[i].getAttribute('data-processing-sources');
-      if (processingSources === null) {
-        // Temporary fallback for datasrc and data-src
-        processingSources = canvas[i].getAttribute('data-src');
-        if (processingSources === null) {
-          processingSources = canvas[i].getAttribute('datasrc');
-        }
-      }
-      if (processingSources) {
-        filenames = processingSources.split(/\s+/g);
-        for (var j = 0; j < filenames.length;) {
-          if (filenames[j]) {
-            j++;
-          } else {
-            filenames.splice(j, 1);
-          }
-        }
-        loadSketchFromSources(canvas[i], filenames);
-      }
-    }
-
     // also process all <script>-indicated sketches, if there are any
     var s, last, source, instance,
         nodelist = document.getElementsByTagName('script'),
-        scripts=[];
+        scripts=[], canvasScripts = {};
 
     // snapshot the DOM, as the nodelist is only a DOM view, and is
     // updated instantly when a script element is added or removed.
@@ -1057,10 +1038,44 @@ module.exports = function finalizeProcessing(Processing, options) {
             continue;
           }
           source =  script.textContent || script.text;
-          instance = new Processing(canvas, source);
+          canvasScripts[canvas.getAttribute('id')] = source;
         }
       }
     }
+
+    for (i = 0, l = canvas.length; i < l; i++) {
+      // datasrc and data-src are deprecated.
+      var processingSources = canvas[i].getAttribute('data-processing-sources');
+      if (processingSources === null) {
+        // Temporary fallback for datasrc and data-src
+        processingSources = canvas[i].getAttribute('data-src');
+        if (processingSources === null) {
+          processingSources = canvas[i].getAttribute('datasrc');
+        }
+      }
+      if (processingSources) {
+        filenames = processingSources.split(/\s+/g);
+        for (var j = 0; j < filenames.length;) {
+          if (filenames[j]) {
+            j++;
+          } else {
+            filenames.splice(j, 1);
+          }
+        }
+        var cid = canvas[i].getAttribute('id');
+        if (cid !== undef && canvasScripts[cid] !== undef) {
+          loadSketchFromSources(canvas[i], filenames, canvasScripts[cid]);
+          delete canvasScripts[cid];
+          continue;
+        }
+        loadSketchFromSources(canvas[i], filenames);
+      }
+    }
+
+    // All remaining scripts are initialized here
+    for (var cid in canvasScripts) {
+      instance = new Processing(document.getElementById(cid), canvasScripts[cid]);
+    }  
   };
 
   /**
