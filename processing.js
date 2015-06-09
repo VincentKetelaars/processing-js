@@ -981,7 +981,7 @@ module.exports = function finalizeProcessing(Processing, options) {
    */
   var init = function() {
     document.removeEventListener('DOMContentLoaded', init, false);
-    var i;
+    var i, filenames, canvas;
 
     // before running through init, clear the instances list, to prevent
     // sketch duplication when page content is dynamically swapped without
@@ -993,9 +993,6 @@ module.exports = function finalizeProcessing(Processing, options) {
         }
       }
     }
-
-    var canvas = document.getElementsByTagName('canvas'),
-      filenames;
 
     // also process all <script>-indicated sketches, if there are any
     var s, last, source, instance,
@@ -1042,6 +1039,8 @@ module.exports = function finalizeProcessing(Processing, options) {
         }
       }
     }
+
+    canvas = document.getElementsByTagName('canvas');
 
     for (i = 0, l = canvas.length; i < l; i++) {
       // datasrc and data-src are deprecated.
